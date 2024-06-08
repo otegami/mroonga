@@ -1,8 +1,8 @@
 name: Install to Ubuntu
 on:
-  schedule:
-    - cron: |
-        0 0 * * *
+  pull_request:
+    paths:
+      - ".github/workflows/install.yml"
 concurrency:
   group: ${{ github.head_ref || github.sha }}-${{ github.workflow }}
   cancel-in-progress: true
