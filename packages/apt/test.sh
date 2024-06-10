@@ -155,10 +155,6 @@ case ${package} in
     ;;
   mysql-*)
     old_package=${package}
-    # TODO: Remove this after we release a package for ubuntu-noble on pckages.groonga.org.
-    if [ "${distribution}-${code_name}" = "ubuntu-noble" ]; then
-      old_package=
-    fi
     mysql_package_prefix=mysql
     client_dev_package=libmysqlclient-dev
     test_package=mysql-testsuite
