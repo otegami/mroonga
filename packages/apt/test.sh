@@ -114,38 +114,12 @@ mysql_community_install_mysql_apt_config() {
 
 case ${package} in
   mariadb-*)
-    old_package=${package}
-    case "${distribution}-${code_name}" in
-      # TODO: Remove debian-bookworm after we release a new
-      # version. We can't do upgrade test because the previous Mroonga
-      # requires old MariaDB that isn't provided by Debian.
-      #
-      # TODO: Remove ubuntu-noble after we release a package for
-      # ubuntu-noble on pckages.groonga.org.
-      debian-bookworm|ubuntu-noble)
-        old_package=
-        ;;
-    esac
     mysql_package_prefix=mariadb
     client_dev_package=libmariadb-dev
     test_package=mariadb-test
     mysql_test_dir=/usr/share/mysql/mysql-test
     ;;
   mysql-community-*)
-    old_package=${package}
-    case "${distribution}-${code_name}" in
-      # TODO: Remove debian-bookworm after we release a package for
-      # debian-bookworm on pckages.groonga.org.
-      #
-      # TODO: Remove ubuntu-jammy after we release a package for
-      # ubuntu-jammy on pckages.groonga.org.
-      #
-      # TODO: Remove ubuntu-noble after we release a package for
-      # ubuntu-noble on pckages.groonga.org.
-      debian-bookworm|ubuntu-jammy|ubuntu-noble)
-        old_package=
-        ;;
-    esac
     wget https://repo.mysql.com/mysql-apt-config.deb
     mysql_community_install_mysql_apt_config
     mysql_package_prefix=mysql
@@ -154,7 +128,6 @@ case ${package} in
     mysql_test_dir=/usr/lib/mysql-test
     ;;
   mysql-*)
-    old_package=${package}
     mysql_package_prefix=mysql
     client_dev_package=libmysqlclient-dev
     test_package=mysql-testsuite
@@ -260,13 +233,13 @@ case ${package} in
 esac
 
 sudo apt update
-if apt show ${old_package} > /dev/null 2>&1; then
-  sudo apt install -V -y ${old_package}
+if apt show ${package} > /dev/null 2>&1; then
+  sudo apt install -V -y ${package}
   sudo mv /tmp/${package}.list /etc/apt/sources.list.d/
   sudo apt update
   sudo apt upgrade -V -y
   sudo mysql -e "SHOW ENGINES" | grep Mroonga
 else
-  echo "Skip because ${old_package} hasn't been released yet."
+  echo "Skip because ${package} hasn't been released yet."
 fi
 echo "::endgroup::"
