@@ -54,6 +54,7 @@ jobs:
       - name: Use JST
         run: |
           Set-TimeZone -Id "Tokyo Standard Time"
+      - uses: actions/checkout@v4
       - uses: actions/setup-ruby@v1
       - name: Detect MariaDB version
         run: |
