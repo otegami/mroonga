@@ -7352,7 +7352,8 @@ int ha_mroonga::storage_write_row(mrn_write_row_buf_t buf)
                              (field->real_type() != MYSQL_TYPE_FLOAT) &&
                              (field->real_type() != MYSQL_TYPE_DOUBLE) &&
                              (field->real_type() != MYSQL_TYPE_TIMESTAMP2) &&
-                             (field->real_type() != MYSQL_TYPE_ENUM)))
+                             (field->real_type() != MYSQL_TYPE_ENUM) &&
+                             (field->real_type() != MYSQL_TYPE_NEWDATE)))
       continue;
 
 #ifdef MRN_SUPPORT_GENERATED_COLUMNS
@@ -12461,11 +12462,13 @@ int ha_mroonga::generic_store_bulk_new_date(Field* field, grn_obj* buf)
   int error = 0;
   bool truncated = false;
   Field_newdate* newdate_field = (Field_newdate*)field;
-  MYSQL_TIME mysql_date;
-  MRN_FIELD_GET_TIME(newdate_field, &mysql_date, current_thd);
   mrn::TimeConverter time_converter;
-  long long int time =
-    time_converter.mysql_time_to_grn_time(&mysql_date, &truncated);
+  long long int time = 0;
+  if (!field->is_null()) {
+    MYSQL_TIME mysql_date;
+    MRN_FIELD_GET_TIME(newdate_field, &mysql_date, current_thd);
+    time = time_converter.mysql_time_to_grn_time(&mysql_date, &truncated);;
+  }
   if (truncated) {
     if (ha_thd()->is_strict_mode()) {
       error = MRN_ERROR_CODE_DATA_TRUNCATE(ha_thd());
