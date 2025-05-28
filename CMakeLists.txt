@@ -273,6 +273,20 @@ set(MRN_ALL_SOURCES
   ${LIBMRN_NEED_MYSQL_SOURCES})
 
 if(MRN_BUNDLED)
+  if(WIN32 AND INSTALL_RUNTIME_DEPENDENCIES)
+    set(GROONGA_BIN_DIR
+      "${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin")
+    message(STATUS
+      "Mroonga: adding DLL search path for runtime-deps: ${GROONGA_BIN_DIR}"
+    )
+    install(
+      RUNTIME_DEPENDENCY_SET mroonga
+      DIRECTORIES
+        "${GROONGA_BIN_DIR}"
+        "$<CONFIG:Debug>:${GROONGA_BIN_DIR}"
+        "$<CONFIG:RelWithDebInfo>:${GROONGA_BIN_DIR}"
+    )
+  endif()
   mysql_add_plugin(mroonga
     ${MRN_ALL_SOURCES}
     STORAGE_ENGINE MODULE_ONLY
