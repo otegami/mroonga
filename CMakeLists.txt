@@ -283,7 +283,7 @@ if(MRN_BUNDLED)
 
     install(CODE
       "file(INSTALL
-        DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin"
+        DIRECTORY "${MRN_BUNDLED_GROONGA_DIR}/lib"
         DESTINATION "${_VCPKG_BIN}")")
   endif()
 else()
