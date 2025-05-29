@@ -273,6 +273,11 @@ set(MRN_ALL_SOURCES
   ${LIBMRN_NEED_MYSQL_SOURCES})
 
 if(MRN_BUNDLED)
+  mysql_add_plugin(mroonga
+    ${MRN_ALL_SOURCES}
+    STORAGE_ENGINE MODULE_ONLY
+    LINK_LIBRARIES ${MRN_LIBRARIES})
+
   file(GLOB _bin_files
     "${CMAKE_CURRENT_BINARY_DIR}/bin/*")
   message(STATUS ">>> Contents of ${CMAKE_CURRENT_BINARY_DIR}/bin:")
@@ -286,6 +291,7 @@ if(MRN_BUNDLED)
   foreach(_f IN LISTS _groonga_files)
     message(STATUS "    ${_f}")
   endforeach()
+
   if(WIN32 AND INSTALL_RUNTIME_DEPENDENCIES)
     install(
       DIRECTORY
@@ -294,11 +300,6 @@ if(MRN_BUNDLED)
       DESTINATION "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
     )
   endif()
-
-  mysql_add_plugin(mroonga
-    ${MRN_ALL_SOURCES}
-    STORAGE_ENGINE MODULE_ONLY
-    LINK_LIBRARIES ${MRN_LIBRARIES})
 else()
   add_library(mroonga MODULE ${MRN_ALL_SOURCES})
 
