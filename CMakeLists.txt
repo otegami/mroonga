@@ -273,33 +273,16 @@ set(MRN_ALL_SOURCES
   ${LIBMRN_NEED_MYSQL_SOURCES})
 
 if(MRN_BUNDLED)
+  if(WIN32 AND INSTALL_RUNTIME_DEPENDENCIES)
+    install(IMPORTED_RUNTIME_ARTIFACTS mroonga
+      RUNTIME_DIRECTORY
+        "${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin"
+    )
+  endif()
   mysql_add_plugin(mroonga
     ${MRN_ALL_SOURCES}
     STORAGE_ENGINE MODULE_ONLY
     LINK_LIBRARIES ${MRN_LIBRARIES})
-
-  file(GLOB _bin_files
-    "${CMAKE_CURRENT_BINARY_DIR}/bin/*")
-  message(STATUS ">>> Contents of ${CMAKE_CURRENT_BINARY_DIR}/bin:")
-  foreach(_f IN LISTS _bin_files)
-    message(STATUS "    ${_f}")
-  endforeach()
-
-  file(GLOB _groonga_files
-    "${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin/*")
-  message(STATUS ">>> Contents of ${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin:")
-  foreach(_f IN LISTS _groonga_files)
-    message(STATUS "    ${_f}")
-  endforeach()
-
-  if(WIN32 AND INSTALL_RUNTIME_DEPENDENCIES)
-    install(
-      DIRECTORY
-        "$${CMAKE_CURRENT_BINARY_DIR}/bin"
-        "${CMAKE_CURRENT_BINARY_DIR}/${MRN_BUNDLED_GROONGA_RELATIVE_DIR}/bin"
-      DESTINATION "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
-    )
-  endif()
 else()
   add_library(mroonga MODULE ${MRN_ALL_SOURCES})
 
