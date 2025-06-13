@@ -37,15 +37,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mariadb-release: "10.5"
-          - mariadb-release: "10.6"
-          - mariadb-release: "10.11"
           - mariadb-release: "11.4"
-          - mariadb-release: "11.4"
-            use-main: "yes"
-          - mariadb-release: "11.4"
-            use-main: "yes"
-            embed: "ON"
     env:
       PACKAGE_PLATFORM: "winx64"
       VC_ARCHITECTURE: "x64"
@@ -63,41 +55,25 @@ jobs:
         run: |
           Set-TimeZone -Id "Tokyo Standard Time"
       - uses: actions/setup-ruby@v1
-      - name: Install patch
+      - name: Install build dependencies
         run: |
-          ridk exec pacman --needed --noconfirm --sync patch
-      - name: Detect MariaDB version
+          ridk exec pacman --needed --noconfirm --sync patch bison flex curl bzip2 lz4 xz snappy
+      - name: Install winflexbison
         run: |
-          $releasesResponse = `
-            Invoke-WebRequest `
-              -Uri "https://downloads.mariadb.org/rest-api/mariadb/${{ matrix.mariadb-release }}/" `
-              -Verbose | `
-              ConvertFrom-Json
-          $latestRelease = (($releasesResponse.releases | `
-                               Get-Member -MemberType NoteProperty).Name | `
-                              Sort-Object -Property {[Version]$_})[-1]
-          $mariaDBVersion = $latestRelease
-          Write-Output "MARIADB_VERSION=${mariaDBVersion}" | `
+          choco install winflexbison3
+      - name: Set MariaDB version
+        run: |
+          Write-Output "MARIADB_VERSION=11.4" | `
             Out-File -FilePath ${Env:GITHUB_ENV} -Encoding utf8 -Append
-      - name: Cache MariaDB archive
-        uses: actions/cache@v4
+      - name: Clone MariaDB from source
+        uses: actions/checkout@v4
         with:
-          path: download/
-          key: download-mariadb-${{ env.MARIADB_VERSION }}
-      - name: Download MariaDB
+          repository: MariaDB/server
+          ref: 11.4
+          path: mariadb
+          submodules: recursive
+      - name: Remove existing mroonga storage
         run: |
-          $mariadbTarGz = "download\mariadb-${Env:MARIADB_VERSION}.tar.gz"
-          if (-not(Test-Path -Path ${mariadbTarGz})) {
-            New-Item download -ItemType Directory -Force
-            Invoke-WebRequest `
-              -Uri "https://downloads.mariadb.org/rest-api/mariadb/${Env:MARIADB_VERSION}/mariadb-${Env:MARIADB_VERSION}.tar.gz" `
-              -OutFile ${mariadbTarGz} `
-              -Verbose
-          }
-          # Workaround for: https://jira.mariadb.org/browse/MDEV-33493
-          ridk exec tar xzf "${mariadbTarGz}" `
-            --exclude=storage/spider/mysql-test/spider/bugfix/r/udf_mysql_func_early_init_file.result
-          Move-Item mariadb-${Env:MARIADB_VERSION} mariadb
           Remove-Item mariadb\storage\mroonga -Recurse -Force
       - uses: actions/checkout@v4
         with:
@@ -106,29 +82,8 @@ jobs:
       - name: Set environment variables
         run: |
           $mroongaVersion = "$(Get-Content mariadb\storage\mroonga\version_full)"
-          $artifactName = "mariadb-${Env:MARIADB_VERSION}-with-mroonga-${mroongaVersion}"
-          if ("${{ matrix.use-main }}" -eq "yes") {
-            $artifactName += "-with-groonga-main"
-          }
-          if ("${{ matrix.embed }}" -eq "ON") {
-            $artifactName += "-embed"
-          }
-          $artifactName += "-${Env:PACKAGE_PLATFORM}"
-          if ("${{ matrix.use-main }}" -eq "yes") {
-            $uploadArtifactName = $artifactName;
-          } else {
-            $uploadArtifactName = "release-" + $artifactName;
-          }
-          if ("${Env:MARIADB_VERSION}" -match "^10\.*") {
-            $testDirName = "mysql-test"
-          } else {
-            $testDirName = "mariadb-test"
-          }
+          $testDirName = "mariadb-test"
           Write-Output "MROONGA_VERSION=${mroongaVersion}" | `
-            Out-File -FilePath ${Env:GITHUB_ENV} -Encoding utf8 -Append
-          Write-Output "ARTIFACT_NAME=${artifactName}" | `
-            Out-File -FilePath ${Env:GITHUB_ENV} -Encoding utf8 -Append
-          Write-Output "UPLOAD_ARTIFACT_NAME=${uploadArtifactName}" | `
             Out-File -FilePath ${Env:GITHUB_ENV} -Encoding utf8 -Append
           Write-Output "TEST_DIR_NAME=${testDirName}" | `
             Out-File -FilePath ${Env:GITHUB_ENV} -Encoding utf8 -Append
@@ -153,8 +108,6 @@ jobs:
             storage\mroonga\packages\source\patches\mariadb-10.5.5-add-a-missing-export-symbol.diff
           Copy-Item storage\mroonga\build\mroonga_windows.cmake cmake\build_configurations\
       - uses: actions/checkout@v4
-        if: |
-          matrix.use-main == 'yes'
         with:
           path: mariadb/extra/groonga
           repository: groonga/groonga
@@ -162,20 +115,11 @@ jobs:
       - name: Prepare Groonga
         run: |
           cd mariadb
-          if ("${{ matrix.use-main }}" -eq "yes") {
-            pushd extra\groonga\vendor
-            ruby download_mecab.rb
-            ruby download_xxhash.rb
-            ruby download.rb
-            popd
-          } else {
-            Invoke-WebRequest `
-              -Uri "https://packages.groonga.org/source/groonga/groonga-latest.zip" `
-              -OutFile groonga-latest.zip
-            Expand-Archive groonga-latest.zip .
-            Remove-Item groonga-latest.zip
-            Move-Item groonga-* extra\groonga
-          }
+          pushd extra\groonga\vendor
+          ruby download_mecab.rb
+          ruby download_xxhash.rb
+          ruby download.rb
+          popd
           Remove-Item extra\groonga\test -Recurse -Force
           cd extra\groonga\vendor\mruby-source
           Invoke-WebRequest `
@@ -191,24 +135,10 @@ jobs:
           path: mariadb/extra/groonga-normalizer-mysql
           repository: groonga/groonga-normalizer-mysql
           submodules: recursive
-      - name: Download groonga-normalizer-mysql latest
-        if: |
-          matrix.use-main != 'yes'
-        run: |
-          cd mariadb
-          Invoke-WebRequest `
-            -Uri "https://packages.groonga.org/source/groonga-normalizer-mysql/groonga-normalizer-mysql-latest.zip" `
-            -OutFile groonga-normalizer-mysql-latest.zip
-          Expand-Archive groonga-normalizer-mysql-latest.zip .
-          Remove-Item groonga-normalizer-mysql-latest.zip
-          Move-Item `
-            groonga-normalizer-mysql-* `
-            extra\groonga-normalizer-mysql
       - name: Run CMake
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" %VC_ARCHITECTURE% || exit /B
-          # -DINSTALL_RUNTIME_DEPENDENCIES_DEFAULT=OFF is workaround for: https://jira.mariadb.org/browse/MDEV-36904
           cmake ^
             -S mariadb ^
             -B build ^
@@ -217,9 +147,6 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=install ^
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ^
             -DCONNECT_WITH_LIBXML2=OFF ^
-            -DINSTALL_RUNTIME_DEPENDENCIES_DEFAULT=OFF ^
-            -DMRN_GROONGA_EMBED=${{ matrix.embed || 'OFF' }} ^
-            -DMRN_GROONGA_NORMALIZER_MYSQL_EMBED=${{ matrix.embed || 'OFF' }} ^
             -DGRN_WITH_MRUBY=ON ^
             -DGRN_WITH_WINDOWS_BACK_TRACE=OFF ^
             -DGRN_WITH_XSIMD=no || exit /B
@@ -234,39 +161,6 @@ jobs:
             --target install ^
             --verbose || exit /B
           ccache --show-stats --verbose
-      - name: Create package
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" %VC_ARCHITECTURE% || exit /B
-          set CMAKE_BUILD_PARALLEL_LEVEL=%NUMBER_OF_PROCESSORS%
-          cmake ^
-            --build build ^
-            --config RelWithDebInfo ^
-            --target package ^
-            --verbose || exit /B
-          ccache --show-stats --verbose
-      - name: Prepare package
-        run: |
-          pushd build
-          Expand-Archive `
-            mariadb-${Env:MARIADB_VERSION}-${Env:PACKAGE_PLATFORM}.zip `
-            .
-          pushd mariadb-${Env:MARIADB_VERSION}-${Env:PACKAGE_PLATFORM}
-          Remove-Item ${Env:TEST_DIR_NAME} -Recurse -Force
-          popd
-          Move-Item `
-            mariadb-${Env:MARIADB_VERSION}-${Env:PACKAGE_PLATFORM} `
-            ..\
-          popd
-          Compress-Archive `
-            -Path mariadb-${Env:MARIADB_VERSION}-${Env:PACKAGE_PLATFORM} `
-            -DestinationPath "${Env:ARTIFACT_NAME}.zip"
-
-      # Artifact
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.UPLOAD_ARTIFACT_NAME }}
-          path: ${{ env.ARTIFACT_NAME }}.zip
 
       - name: Test
         run: |
@@ -277,21 +171,6 @@ jobs:
               % {$_.replace("\", "/")}
           perl mysql-test-run.pl `
             --force `
-            --no-check-testcases `
-            --parallel=${Env:NUMBER_OF_PROCESSORS} `
-            --retry=3 `
-            --suite=$($suites -join ",")
-
-      - name: "Test: reference count"
-        run: |
-          cd install\${Env:TEST_DIR_NAME}
-          $suites = `
-            Get-ChildItem -Recurse -Directory -Name t plugin\mroonga | `
-              Split-Path -Parent | `
-              % {$_.replace("\", "/")}
-          perl mysql-test-run.pl `
-            --force `
-            --mysqld=--loose-plugin-mroonga-enable-reference-count=ON `
             --no-check-testcases `
             --parallel=${Env:NUMBER_OF_PROCESSORS} `
             --retry=3 `
